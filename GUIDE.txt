@@ -1,0 +1,14 @@
+SUPER OVER AUTOMATIC TESTING - what exists now (all free, assistant-run).
+
+You do not need to do anything for the tests to run:
+- Every hour, one Android version (rotating 11, 12, 12L, 13, 14) plays the
+  game by itself for several sessions and saves what it saw.
+- Once a week, all five Android versions run a bigger batch.
+- Every time a new game build ships, two full runs start automatically with
+  different random seeds and devices.
+- After each run I read the results and send you a plain-language report,
+  including how the game looks (screenshots of the menu, team selection,
+  match, drinks break, What's New and results screens on different screen
+  sizes) and honest notes on readability and layout.
+
+If you ever want an extra run: tell me, and I start one.
