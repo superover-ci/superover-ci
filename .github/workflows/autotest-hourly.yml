@@ -1,0 +1,83 @@
+# Hourly soak: one emulator per run, rotating Android version, device profile and seeds.
+# Place at .github/workflows/autotest-hourly.yml
+name: Super Over hourly autotest
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # keepalive commit keeps the schedule alive
+
+jobs:
+  hourly:
+    runs-on: ubuntu-latest
+    name: "hourly"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pick rotation for this hour
+        run: |
+          APIS=(30 31 32 33 34)
+          H=$((10#$(date -u +%H)))
+          API=${APIS[$((H % 5))]}
+          D=$((10#$(date -u +%j)))
+          if [ $((D % 2)) -eq 0 ]; then PROFILE=pixel_6; else PROFILE="Nexus 6"; fi
+          SEED=$(( ($(date +%s) / 3600) % 100000 ))
+          echo "API=$API" >> "$GITHUB_ENV"
+          echo "PROFILE=$PROFILE" >> "$GITHUB_ENV"
+          echo "SEED=$SEED" >> "$GITHUB_ENV"
+          echo "rotating: api=$API profile=$PROFILE seed_base=$SEED"
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Download and verify the CI build
+        env:
+          PART_IDS: ${{ secrets.SUPEROVER_APK_PART_IDS }}
+          APK_SHA: ${{ secrets.SUPEROVER_APK_SHA256 }}
+        run: |
+          i=1
+          for id in $(echo "$PART_IDS" | tr ',' ' '); do
+            curl -sSL "https://drive.google.com/uc?export=download&id=$id" -o "part$i"
+            i=$((i+1))
+          done
+          cat part1 part2 part3 part4 > game.apk
+          echo "$APK_SHA  game.apk" | sha256sum -c -
+
+      - name: Boot emulator and run sessions
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ env.API }}
+          arch: x86_64
+          profile: ${{ env.PROFILE }}
+          emulator-options: -no-snapshot-save -noaudio -no-boot-anim -memory 3072
+          script: |
+            adb wait-for-device
+            adb shell settings put global window_animation_scale 0
+            adb shell settings put global transition_animation_scale 0
+            adb shell settings put global animator_duration_scale 0
+            adb install -r game.apk
+            bash run_sessions.sh ${{ env.API }} 6 150 ${{ env.SEED }} artifacts
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hourly-api${{ env.API }}-run${{ github.run_number }}
+          path: artifacts
+          retention-days: 14
+
+      - name: Keepalive commit (keeps scheduled workflows enabled)
+        if: always()
+        run: |
+          mkdir -p .keepalive
+          date -u +%FT%TZ > .keepalive/last-run.txt
+          git config user.name "superover-ci-bot"
+          git config user.email "li4mh0@mail.instinct.com"
+          git add .keepalive/last-run.txt
+          git commit -m "keepalive: hourly autotest ran" || echo "nothing to commit"
+          git push || echo "keepalive push failed (non-fatal)"
