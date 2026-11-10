@@ -33,11 +33,11 @@ FEATURES = {
     "setup":       r"choose.*(team|format)|team 11|playing 11|select.*overs",
     "xi_speech":   r"wicketkeeper|of 11",
     "toss":        r"toss",
-    "live_match":  r"attack|big hit|defend|yorker|bouncer",
-    "live_panel":  r"scorecard|live",
-    "drinks":      r"drinks break",
+    "live_match":  r"(?=.*\bbig hit\b|\byorker\b)(?!.*gesture guide).*",
+    "live_panel":  r"(?=.*\bscorecard\b)(?!.*gesture guide).*",
+    "drinks":      r"(?=.*drinks break)(?!.*gesture guide).*",
     "guide":       r"gesture guide|practice area|drill",
-    "whatsnew":    r"what's new|version 10\.",
+    "whatsnew":    r"version 10\.",
     "results":     r"match ended|won by|play again",
     "settings":    r"controls|voice|music|speed",
 }
@@ -52,7 +52,8 @@ TOURS = {
         (r"gesture guide", 6), (r"practice|drill|start", 6),
     ],
     "tour_quick_t20": [
-        (r"quick match", 6), (r"t20|20 overs", 6), (r"continue|next|start", 8),
+        (r"quick match", 6), (r"auto select", 30), (r"continue", 8),
+        (r"continue", 8), (r"heads|tails", 10),
     ],
     "tour_odi_setup": [
         (r"quick match", 6), (r"odi|50 overs", 6), (r"back|main menu|home", 6),
@@ -250,8 +251,9 @@ def main():
                         emit({"type": "tour_aborted", "tour": tname, "step": step,
                               "screen": texts[:200]})
                         tour = None
+                    # fall through to a random action so waiting tours still move
 
-        if not acted and tour is None:
+        if not acted:
             actionable = [n for n in ns if n["clickable"] and (n["desc"] or n["text"])
                           and n["w"] > 0 and n["h"] > 0]
             roll = rng.random()
