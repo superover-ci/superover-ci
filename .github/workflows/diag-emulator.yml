@@ -33,7 +33,7 @@ jobs:
           ls -la ~/.android/avd/ 2>&1
           find / -name "test.ini" -not -path "/proc/*" 2>/dev/null
           echo "--- launch (swiftshader) ---"
-          $ANDROID_HOME/emulator/emulator -port 5554 -avd test -no-snapshot-save -noaudio -no-boot-anim -memory 3072 -gpu swiftshader_indirect -verbose > emu.log 2>&1 &
+          $ANDROID_HOME/emulator/emulator -port 5554 -avd test -no-snapshot-save -noaudio -no-boot-anim -memory 3072 -no-window -gpu swiftshader_indirect -verbose > emu.log 2>&1 &
           sleep 110
           echo "=== adb devices ==="
           $ANDROID_HOME/platform-tools/adb devices -l
