@@ -1,0 +1,32 @@
+name: Diagnose emulator boot
+on:
+  workflow_dispatch:
+    inputs:
+      api:
+        default: "30"
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+      - name: Install emulator dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpulse0
+      - name: Launch emulator manually and capture output
+        env:
+          API: ${{ inputs.api }}
+        run: |
+          sdkmanager --install "system-images;android-$API;default;x86_64" --channel=0 > /dev/null
+          echo no | avdmanager create avd --force -n test --package "system-images;android-$API;default;x86_64" --device pixel_6
+          printf 'hw.cpu.ncore=2\n' >> ~/.android/avd/test.avd/config.ini
+          $ANDROID_HOME/emulator/emulator -port 5554 -avd test -no-snapshot-save -noaudio -no-boot-anim -memory 3072 -verbose > emu.log 2>&1 &
+          sleep 100
+          echo "=== adb devices ==="
+          adb devices -l || true
+          echo "=== emulator process ==="
+          ps aux | grep -i [e]mulator || echo "no emulator process"
+          echo "=== emu.log ==="
+          cat emu.log
