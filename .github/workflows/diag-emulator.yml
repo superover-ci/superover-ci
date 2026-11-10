@@ -19,13 +19,19 @@ jobs:
         env:
           API: ${{ inputs.api }}
         run: |
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "system-images;android-$API;default;x86_64" --channel=0 > /dev/null
-          echo no | $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd --force -n test --package "system-images;android-$API;default;x86_64" --device pixel_6
+          set +e
+          SDK=$ANDROID_HOME/cmdline-tools/latest/bin
+          yes | $SDK/sdkmanager --licenses > /dev/null 2>&1
+          $SDK/sdkmanager --install "platforms;android-$API" "system-images;android-$API;default;x86_64" --channel=0
+          echo "--- create avd ---"
+          echo no | $SDK/avdmanager create avd --force -n test --package "system-images;android-$API;default;x86_64" --device pixel_6
+          echo "avd exit: $?"
           printf 'hw.cpu.ncore=2\n' >> ~/.android/avd/test.avd/config.ini
+          echo "--- launch ---"
           $ANDROID_HOME/emulator/emulator -port 5554 -avd test -no-snapshot-save -noaudio -no-boot-anim -memory 3072 -verbose > emu.log 2>&1 &
           sleep 100
           echo "=== adb devices ==="
-          $ANDROID_HOME/platform-tools/adb devices -l || true
+          $ANDROID_HOME/platform-tools/adb devices -l
           echo "=== emulator process ==="
           ps aux | grep -i [e]mulator || echo "no emulator process"
           echo "=== emu.log ==="
