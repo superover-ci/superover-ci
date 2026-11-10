@@ -52,11 +52,12 @@ TOURS = {
         (r"gesture guide", 6), (r"practice|drill|start", 6),
     ],
     "tour_quick_t20": [
-        (r"quick match", 6), (r"auto select", 30), (r"continue", 8),
-        (r"continue", 8), (r"heads|tails", 10),
+        (r"quick match", 6), (r"india", 6), (r"t20|20 overs", 6),
+        (r"auto select", 30), (r"continue", 8),
+        (r"samson", 8), (r"heads|tails", 10),
     ],
     "tour_odi_setup": [
-        (r"quick match", 6), (r"odi|50 overs", 6), (r"back|main menu|home", 6),
+        (r"quick match", 6), (r"india", 6), (r"odi|50 overs", 6), (r"back|main menu|home", 6),
     ],
     "tour_settings_toggle": [
         (r"settings", 6), (r"controls|gestures|buttons", 6), (r"back|main menu|home", 6),
