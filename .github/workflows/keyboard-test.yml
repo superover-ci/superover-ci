@@ -8,6 +8,7 @@ jobs:
   kbtest:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Enable KVM
         run: sudo chmod 666 /dev/kvm
       - name: Install emulator dependencies
