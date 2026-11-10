@@ -69,6 +69,25 @@ def adb(*args, timeout=30, binary=False):
 def pid():
     return adb("shell", "pidof", PKG).strip()
 
+def foreground_pkg():
+    try:
+        out = adb("shell", "dumpsys", "window", "displays", timeout=20)
+        m = re.search(r"mCurrentFocus=\S+\s+([\w.]+)/", out)
+        return m.group(1) if m else ""
+    except Exception:
+        return ""
+
+def ensure_foreground(step, counts):
+    """If focus has left the game (e.g. BACK at the root screen), relaunch it."""
+    fp = foreground_pkg()
+    if fp and fp != PKG:
+        counts["escape"] += 1
+        emit({"type": "event", "event": "APP_ESCAPE", "step": step, "screen": fp})
+        adb("shell", "am", "start", "-n", MAIN)
+        time.sleep(4)
+        return False
+    return True
+
 def dump_ui():
     try:
         adb("shell", "uiautomator", "dump", "/sdcard/__autotest.xml", timeout=40)
@@ -139,7 +158,7 @@ def main():
     shots = os.path.join(a.out, "shots")
     os.makedirs(shots, exist_ok=True)
     counts = {"tap": 0, "activate": 0, "swipe": 0, "back": 0,
-              "crash": 0, "stall": 0, "silent_speech": 0}
+              "crash": 0, "stall": 0, "silent_speech": 0, "escape": 0}
     covered = set()
     emit({"type": "start", "seed": a.seed, "steps": a.steps, "tours": a.tours})
 
@@ -163,6 +182,10 @@ def main():
             time.sleep(8)
             if counts["crash"] >= 3:
                 break
+            continue
+
+        if not ensure_foreground(step, counts):
+            time.sleep(1.0)
             continue
 
         ns = nodes(dump_ui())
