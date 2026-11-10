@@ -46,6 +46,10 @@ jobs:
           i=1
           for id in $(echo "$PART_IDS" | tr ',' ' '); do
             curl -sSL "https://drive.google.com/uc?export=download&id=$id" -o "part$i"
+            if [ "$(head -c 1 "part$i")" = "<" ]; then
+              # Drive virus-scan interstitial: retry through the confirm endpoint
+              curl -sSL "https://drive.usercontent.google.com/download?id=$id&export=download&confirm=t" -o "part$i"
+            fi
             i=$((i+1))
           done
           cat part1 part2 part3 part4 > game.apk
