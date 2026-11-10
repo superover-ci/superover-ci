@@ -1,0 +1,80 @@
+# Full matrix: Android 11-14 (API 30-34), one emulator per version.
+# Runs weekly on a timer, and on every new build it is dispatched twice by the
+# build process with different seed_base/profile inputs (= 2 full runs per build).
+# Place at .github/workflows/autotest-full.yml
+name: Super Over full autotest
+on:
+  schedule:
+    - cron: "42 3 * * 0"   # weekly, Sunday 03:42 UTC
+  workflow_dispatch:
+    inputs:
+      sessions:
+        description: "Auto-play sessions per Android version"
+        default: "20"
+      steps:
+        description: "Actions per session"
+        default: "150"
+      seed_base:
+        description: "Base seed (build run 1: 1000, build run 2: 5000)"
+        default: "1000"
+      profile:
+        description: "Emulator device profile"
+        default: "pixel_6"
+
+jobs:
+  full:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [30, 31, 32, 33, 34]   # Android 11, 12, 12L, 13, 14
+    name: "API ${{ matrix.api }}"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Download and verify the CI build
+        env:
+          PART_IDS: ${{ secrets.SUPEROVER_APK_PART_IDS }}
+          APK_SHA: ${{ secrets.SUPEROVER_APK_SHA256 }}
+        run: |
+          i=1
+          for id in $(echo "$PART_IDS" | tr ',' ' '); do
+            curl -sSL "https://drive.google.com/uc?export=download&id=$id" -o "part$i"
+            i=$((i+1))
+          done
+          cat part1 part2 part3 part4 > game.apk
+          echo "$APK_SHA  game.apk" | sha256sum -c -
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Boot emulator and run sessions
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          profile: ${{ inputs.profile }}
+          emulator-options: -no-snapshot-save -noaudio -no-boot-anim -memory 3072
+          script: |
+            adb wait-for-device
+            adb shell settings put global window_animation_scale 0
+            adb shell settings put global transition_animation_scale 0
+            adb shell settings put global animator_duration_scale 0
+            adb install -r game.apk
+            bash run_sessions.sh ${{ matrix.api }} ${{ inputs.sessions }} ${{ inputs.steps }} $(( ${{ inputs.seed_base }} + ${{ matrix.api }} * 100 )) artifacts/api${{ matrix.api }}
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-api${{ matrix.api }}-run${{ github.run_number }}
+          path: artifacts/api${{ matrix.api }}
+          retention-days: 30
