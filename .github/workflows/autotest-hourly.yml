@@ -52,6 +52,9 @@ jobs:
           cat part1 part2 part3 part4 > game.apk
           echo "$APK_SHA  game.apk" | sha256sum -c -
 
+      - name: Install emulator dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpulse0
+
       - name: Boot emulator and run sessions
         uses: reactivecircus/android-emulator-runner@v2
         with:
