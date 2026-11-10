@@ -20,7 +20,7 @@ jobs:
           API: ${{ inputs.api }}
         run: |
           set +e
-          export ANDROID_AVD_HOME=/home/runner/.android/avd
+          export ANDROID_AVD_HOME=/home/runner/.config/.android/avd
           echo "HOME=$HOME ANDROID_HOME=$ANDROID_HOME ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT ANDROID_AVD_HOME=$ANDROID_AVD_HOME"
           SDK=$ANDROID_HOME/cmdline-tools/latest/bin
           yes | $SDK/sdkmanager --licenses > /dev/null 2>&1
