@@ -33,7 +33,7 @@ jobs:
       - name: Install and launch Settings
         run: |
           ADB=$ANDROID_HOME/platform-tools/adb
-          $ADB -s emulator-5554 install -r kb/VoiceTypeKeyboard-1.0.apk
+          $ADB -s emulator-5554 install -r kb/VoiceTypeKeyboard-1.0.1.apk
           $ADB -s emulator-5554 logcat -c
           echo "=== launch SettingsActivity ==="
           $ADB -s emulator-5554 shell am start -n com.voicetype.keyboard/.SettingsActivity
