@@ -4,6 +4,8 @@ on:
     inputs:
       api:
         default: "30"
+      abi:
+        default: "x86_64"
 jobs:
   kbtest:
     runs-on: ubuntu-latest
@@ -18,14 +20,15 @@ jobs:
           API: ${{ inputs.api }}
         run: |
           export ANDROID_AVD_HOME=/home/runner/.config/.android/avd
+          ABI="${{ inputs.abi }}"
           SDK=$ANDROID_HOME/cmdline-tools/latest/bin
           yes | $SDK/sdkmanager --licenses > /dev/null 2>&1
-          $SDK/sdkmanager --install "platforms;android-$API" "system-images;android-$API;default;x86_64" --channel=0 | tail -1
-          echo no | $SDK/avdmanager create avd --force -n test --package "system-images;android-$API;default;x86_64" --device pixel_6 2>&1 | tail -2
-          $ANDROID_HOME/emulator/emulator -port 5554 -avd test -no-snapshot-save -noaudio -no-boot-anim -memory 3072 -no-window -gpu swiftshader_indirect > emu.log 2>&1 &
+          $SDK/sdkmanager --install "platforms;android-$API" "system-images;android-$API;default;$ABI" --channel=0 | tail -1
+          echo no | $SDK/avdmanager create avd --force -n test --package "system-images;android-$API;default;$ABI" --device pixel_6 2>&1 | tail -2
+          $ANDROID_HOME/emulator/emulator -port 5554 -avd test -no-snapshot-save -noaudio -no-boot-anim -memory 3072 -no-window -gpu swiftshader_indirect -accel off > emu.log 2>&1 &
           ADB=$ANDROID_HOME/platform-tools/adb
           $ADB -s emulator-5554 wait-for-device
-          for i in $(seq 1 60); do
+          for i in $(seq 1 150); do
             B=$($ADB -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
             [ "$B" = "1" ] && break; sleep 5
           done
