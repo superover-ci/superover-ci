@@ -20,19 +20,23 @@ jobs:
           API: ${{ inputs.api }}
         run: |
           set +e
+          echo "HOME=$HOME ANDROID_HOME=$ANDROID_HOME ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT ANDROID_AVD_HOME=$ANDROID_AVD_HOME"
           SDK=$ANDROID_HOME/cmdline-tools/latest/bin
           yes | $SDK/sdkmanager --licenses > /dev/null 2>&1
-          $SDK/sdkmanager --install "platforms;android-$API" "system-images;android-$API;default;x86_64" --channel=0
+          $SDK/sdkmanager --install "platforms;android-$API" "system-images;android-$API;default;x86_64" --channel=0 | tail -1
           echo "--- create avd ---"
-          echo no | $SDK/avdmanager create avd --force -n test --package "system-images;android-$API;default;x86_64" --device pixel_6
+          echo no | $SDK/avdmanager create avd --force -n test --package "system-images;android-$API;default;x86_64" --device pixel_6 2>&1
           echo "avd exit: $?"
-          printf 'hw.cpu.ncore=2\n' >> ~/.android/avd/test.avd/config.ini
-          echo "--- launch ---"
-          $ANDROID_HOME/emulator/emulator -port 5554 -avd test -no-snapshot-save -noaudio -no-boot-anim -memory 3072 -verbose > emu.log 2>&1 &
-          sleep 100
+          echo "--- avd locations ---"
+          $SDK/avdmanager list avd 2>&1
+          ls -la ~/.android/avd/ 2>&1
+          find / -name "test.ini" -not -path "/proc/*" 2>/dev/null
+          echo "--- launch (swiftshader) ---"
+          $ANDROID_HOME/emulator/emulator -port 5554 -avd test -no-snapshot-save -noaudio -no-boot-anim -memory 3072 -gpu swiftshader_indirect -verbose > emu.log 2>&1 &
+          sleep 110
           echo "=== adb devices ==="
           $ANDROID_HOME/platform-tools/adb devices -l
-          echo "=== emulator process ==="
-          ps aux | grep -i [e]mulator || echo "no emulator process"
-          echo "=== emu.log ==="
-          cat emu.log
+          echo "=== boot prop ==="
+          $ANDROID_HOME/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed 2>&1
+          echo "=== emu.log tail ==="
+          tail -60 emu.log
