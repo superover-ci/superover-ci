@@ -1,0 +1,64 @@
+name: Keyboard launch test
+on:
+  workflow_dispatch:
+    inputs:
+      api:
+        default: "30"
+jobs:
+  kbtest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable KVM
+        run: sudo chmod 666 /dev/kvm
+      - name: Install emulator dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpulse0
+      - name: Boot emulator
+        env:
+          API: ${{ inputs.api }}
+        run: |
+          export ANDROID_AVD_HOME=/home/runner/.config/.android/avd
+          SDK=$ANDROID_HOME/cmdline-tools/latest/bin
+          yes | $SDK/sdkmanager --licenses > /dev/null 2>&1
+          $SDK/sdkmanager --install "platforms;android-$API" "system-images;android-$API;default;x86_64" --channel=0 | tail -1
+          echo no | $SDK/avdmanager create avd --force -n test --package "system-images;android-$API;default;x86_64" --device pixel_6 2>&1 | tail -2
+          $ANDROID_HOME/emulator/emulator -port 5554 -avd test -no-snapshot-save -noaudio -no-boot-anim -memory 3072 -no-window -gpu swiftshader_indirect > emu.log 2>&1 &
+          ADB=$ANDROID_HOME/platform-tools/adb
+          $ADB -s emulator-5554 wait-for-device
+          for i in $(seq 1 60); do
+            B=$($ADB -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
+            [ "$B" = "1" ] && break; sleep 5
+          done
+          echo "boot_completed=$B"
+      - name: Install and launch Settings
+        run: |
+          ADB=$ANDROID_HOME/platform-tools/adb
+          $ADB -s emulator-5554 install -r kb/VoiceTypeKeyboard-1.0.apk
+          $ADB -s emulator-5554 logcat -c
+          echo "=== launch SettingsActivity ==="
+          $ADB -s emulator-5554 shell am start -n com.voicetype.keyboard/.SettingsActivity
+          sleep 8
+          echo "=== pidof ==="
+          $ADB -s emulator-5554 shell pidof com.voicetype.keyboard || echo "NO PROCESS"
+          echo "=== FATAL / AndroidRuntime in logcat ==="
+          $ADB -s emulator-5554 logcat -d | grep -iE "FATAL|AndroidRuntime|keeps stopping|voicetype" | head -80
+          echo "=== full crash buffer ==="
+          $ADB -s emulator-5554 logcat -d -b crash | tail -100
+      - name: Enable and bind IME
+        run: |
+          ADB=$ANDROID_HOME/platform-tools/adb
+          echo "=== ime list ==="
+          $ADB -s emulator-5554 shell ime list -s
+          echo "=== enable + set ==="
+          $ADB -s emulator-5554 shell ime enable com.voicetype.keyboard/.VoiceIME
+          $ADB -s emulator-5554 shell ime set com.voicetype.keyboard/.VoiceIME
+          sleep 3
+          echo "=== dumpsys input_method (head) ==="
+          $ADB -s emulator-5554 shell dumpsys input_method | head -30
+          echo "=== logcat after IME bind ==="
+          $ADB -s emulator-5554 logcat -d | grep -iE "FATAL|AndroidRuntime|VoiceIME|voicetype" | tail -60
+          $ADB -s emulator-5554 logcat -d > /tmp/kb-logcat.txt
+      - name: Upload logcat
+        uses: actions/upload-artifact@v4
+        with:
+          name: kb-logcat
+          path: /tmp/kb-logcat.txt
