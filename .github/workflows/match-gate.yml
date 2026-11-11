@@ -8,7 +8,7 @@ on:
 
 jobs:
   full:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
@@ -41,6 +41,8 @@ jobs:
       - name: Install emulator dependencies
         timeout-minutes: 5
         run: |
+          sudo sed -i s/azure.archive.ubuntu.com/archive.ubuntu.com/g /etc/apt/sources.list
+          if [ -f /etc/apt/apt-mirrors.txt ]; then echo https://archive.ubuntu.com/ubuntu | sudo tee /etc/apt/apt-mirrors.txt; fi
           for attempt in 1 2 3; do
             sudo apt-get -o Acquire::Retries=2 update && sudo apt-get -o Acquire::Retries=2 install -y libpulse0 && exit 0
             sleep 10
