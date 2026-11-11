@@ -151,7 +151,7 @@ def screen_text(ns):
 
 def find_node(ns, rx):
     r = re.compile(rx, re.I)
-    cands = [n for n in ns if n["clickable"] and r.search(n["desc"] + " " + n["text"])
+    cands = [n for n in ns if n["clickable"] and any(r.search(v.strip()) for v in (n["desc"], n["text"]) if v.strip())
              and n["w"] > 0 and n["h"] > 0]
     return cands[0] if cands else None
 
