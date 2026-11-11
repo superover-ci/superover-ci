@@ -12,13 +12,21 @@ def activate(n,menu):
   time.sleep(.2);swipe('right')
  else:
   time.sleep(.2);d.tap(n['cx'],n['cy'],False)
-def find(ns,rx):return d.find_node([n for n in ns if n['package']==d.PKG],rx)
+def find(ns,rx):
+ r=re.compile(rx,re.I)
+ return next((n for n in ns if n['package']==d.PKG and n['clickable'] and n['w']>0 and n['h']>0 and any(r.search(v.strip()) for v in [n['desc'],n['text']] if v.strip())),None)
 d.adb('shell','pm','clear',d.PKG);d.adb('shell','am','start','-n',d.MAIN);time.sleep(8)
 for step in range(220):
  if time.time()-start>1500:raise RuntimeError('25-minute deterministic match timeout')
  fp=d.foreground_pkg()
  if fp!=d.PKG:raise RuntimeError('Test left game: '+fp)
- ns=d.nodes(d.dump_ui());txt=d.screen_text(ns);low=txt.lower();menu=True;rx=None;act=None
+ xml=d.dump_ui();ns=d.nodes(xml);txt=d.screen_text(ns);low=txt.lower();menu=True;rx=None;act=None
+ open(out+'/latest.xml','w').write(xml)
+ if txt==last:same+=1
+ else:same=0
+ last=txt
+ if same>18:
+  d.shot(out,'stalled');raise RuntimeError('Unchanged UI for19steps: '+txt[:1200])
  if not ns:raise RuntimeError('No UI tree, cannot validate')
  if 'offline hindi speech unavailable' in low:raise RuntimeError('Silent speech fallback')
  if 'play again' in low:
