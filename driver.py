@@ -18,6 +18,8 @@ Usage: python3 driver.py --seed 7 --steps 150 --out artifacts/s7
 """
 import argparse, hashlib, json, os, random, re, subprocess, sys, time
 
+CURSOR_SCREEN = True
+SCREEN_W, SCREEN_H = 1080, 1920
 PKG = "com.superover.cricket"
 MAIN = PKG + "/.MainActivity"
 SILENT_MARK = "Offline Hindi speech unavailable"
@@ -52,12 +54,12 @@ TOURS = {
         (r"gesture guide", 6), (r"practice|drill|start", 6),
     ],
     "tour_quick_t20": [
-        (r"quick match", 6), (r"india", 6), (r"t20|20 overs", 6),
+        (r"quick match", 6), (r"india", 6), (r"australia", 6), (r"^2 overs$", 6),
         (r"auto select", 30), (r"continue", 8),
         (r"samson", 8), (r"heads|tails", 10),
     ],
     "tour_odi_setup": [
-        (r"quick match", 6), (r"india", 6), (r"odi|50 overs", 6), (r"back|main menu|home", 6),
+        (r"quick match", 6), (r"india", 6), (r"australia", 6), (r"odi|50 overs", 6), (r"back|main menu|home", 6),
     ],
     "tour_settings_toggle": [
         (r"settings", 6), (r"controls|gestures|buttons", 6), (r"back|main menu|home", 6),
@@ -130,7 +132,11 @@ def tap(x, y, double):
     adb("shell", "input", "tap", str(x), str(y))
     if double:
         time.sleep(0.28)
-        adb("shell", "input", "tap", str(x), str(y))
+        if CURSOR_SCREEN:
+            x0, y0 = int(SCREEN_W*.4), int(SCREEN_H*.4)
+            adb("shell", "input", "swipe", str(x0), str(y0), str(x0+int(SCREEN_W*.3)), str(y0), "220")
+        else:
+            adb("shell", "input", "tap", str(x), str(y))
 
 def shot(out, name):
     try:
@@ -150,6 +156,9 @@ def find_node(ns, rx):
     return cands[0] if cands else None
 
 def main():
+    global CURSOR_SCREEN, SCREEN_W, SCREEN_H
+    sz = re.search(r"(\d+)x(\d+)", adb("shell", "wm", "size"))
+    if sz: SCREEN_W, SCREEN_H = map(int, sz.groups())
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, required=True)
     ap.add_argument("--steps", type=int, default=150)
@@ -193,6 +202,7 @@ def main():
 
         ns = nodes(dump_ui())
         texts = screen_text(ns)
+        CURSOR_SCREEN = not any(k in texts.lower() for k in ["striker:", "choose your opening bowler", "choose your two opening batsmen", "choose the next batsman", "swipe to bat"])
         descs = set((n["cls"], n["desc"], n["text"]) for n in ns)
 
         # feature coverage + first-sighting screenshots
@@ -218,7 +228,8 @@ def main():
                   "screen": texts[:400]})
             shot(shots, "stall_%d" % step)
             # nudge out of the stall: back, then a centre swipe
-            adb("shell", "input", "keyevent", "4")
+            if " | Main menu | " not in texts:
+                adb("shell", "input", "keyevent", "4")
             time.sleep(0.6)
 
         # deterministic tour step takes priority when one is armed
@@ -272,12 +283,14 @@ def main():
                 emit({"type": "action", "step": step, "action": kind,
                       "target": (n["desc"] or n["text"])[:120]})
             elif roll < 0.93:
-                x, y = 540, 1200
+                x, y = int(SCREEN_W*.45), int(SCREEN_H*.45)
                 dx, dy = rng.choice([(350, 0), (-350, 0), (0, 500), (0, -500)])
                 adb("shell", "input", "swipe", str(x), str(y), str(x + dx), str(y + dy), "300")
                 counts["swipe"] += 1
                 emit({"type": "action", "step": step, "action": "swipe"})
             else:
+                if " | Main menu | " in texts:
+                    continue
                 adb("shell", "input", "keyevent", "4")
                 counts["back"] += 1
                 emit({"type": "action", "step": step, "action": "back"})
