@@ -41,13 +41,18 @@ jobs:
       - name: Install emulator dependencies
         timeout-minutes: 5
         run: |
-          sudo sed -i s/azure.archive.ubuntu.com/archive.ubuntu.com/g /etc/apt/sources.list
-          if [ -f /etc/apt/apt-mirrors.txt ]; then echo https://archive.ubuntu.com/ubuntu | sudo tee /etc/apt/apt-mirrors.txt; fi
-          for attempt in 1 2 3; do
-            sudo apt-get -o Acquire::Retries=2 update && sudo apt-get -o Acquire::Retries=2 install -y libpulse0 && exit 0
-            sleep 10
-          done
-          exit 1
+          mkdir -p /tmp/emulator-debs
+          sudo apt-get --print-uris --yes install libpulse0 > /tmp/emulator-package-urls
+          cat /tmp/emulator-package-urls
+          python3 - <<'PYSETUP'
+          import re, subprocess
+          text=open('/tmp/emulator-package-urls').read()
+          for url, filename in re.findall(r"^'([^']+)'\s+(\S+)",text,re.M):
+              url=url.replace('http://','https://').replace('azure.archive.ubuntu.com','archive.ubuntu.com')
+              subprocess.run(['curl','-fSL','--retry','2','--connect-timeout','20',url,'-o','/tmp/emulator-debs/'+filename],check=True)
+          PYSETUP
+          if ls /tmp/emulator-debs/*.deb >/dev/null 2>&1; then sudo dpkg -i /tmp/emulator-debs/*.deb; fi
+          ldconfig -p | grep libpulse.so
 
       - name: Set up Python
         uses: actions/setup-python@v5
