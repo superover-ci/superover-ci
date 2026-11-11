@@ -8,10 +8,7 @@ def swipe(direction):
  x,y=int(W*.45),int(H*.45);dx,dy={'right':(int(W*.3),0),'up':(0,-int(H*.2)),'down':(0,int(H*.2))}[direction];d.adb('shell','input','swipe',str(x),str(y),str(x+dx),str(y+dy),'220')
 def activate(n,menu):
  d.tap(n['cx'],n['cy'],False)
- if menu:
-  time.sleep(.2);swipe('right')
- else:
-  time.sleep(.2);d.tap(n['cx'],n['cy'],False)
+ time.sleep(.25);swipe('right')
 def find(ns,rx):
  r=re.compile(rx,re.I)
  return next((n for n in ns if n['package']==d.PKG and n['clickable'] and n['w']>0 and n['h']>0 and any(r.search(v.strip()) for v in [n['desc'],n['text']] if v.strip())),None)
