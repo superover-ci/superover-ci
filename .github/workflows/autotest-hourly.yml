@@ -51,7 +51,21 @@ jobs:
           echo "$APK_SHA  game.apk" | sha256sum -c -
 
       - name: Install emulator dependencies
-        run: sudo apt-get update && sudo apt-get install -y libpulse0
+        timeout-minutes: 5
+        run: |
+          mkdir -p /tmp/emulator-debs
+          sudo apt-get --print-uris --yes install libpulse0 > /tmp/emulator-package-urls
+          cat /tmp/emulator-package-urls
+          python3 - <<'PYSETUP'
+          import re, subprocess
+          text=open('/tmp/emulator-package-urls').read()
+          for url, filename in re.findall(r"^'([^']+)'\s+(\S+)",text,re.M):
+              url=re.sub(r'^mirror\+file:/etc/apt/[^/]+', 'https://archive.ubuntu.com/ubuntu', url)
+              url=url.replace('http://','https://').replace('azure.archive.ubuntu.com','archive.ubuntu.com')
+              subprocess.run(['curl','-fSL','--resolve','archive.ubuntu.com:443:185.125.190.81','--retry','2','--connect-timeout','20',url,'-o','/tmp/emulator-debs/'+filename],check=True)
+          PYSETUP
+          if ls /tmp/emulator-debs/*.deb >/dev/null 2>&1; then sudo dpkg -i /tmp/emulator-debs/*.deb; fi
+          ldconfig -p | grep libpulse.so
 
       - name: Boot emulator and run sessions
         uses: reactivecircus/android-emulator-runner@v2
