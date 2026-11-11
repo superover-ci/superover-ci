@@ -7,8 +7,21 @@ sz=d.adb('shell','wm','size');m=re.search(r'(\d+)x(\d+)',sz);W,H=map(int,m.group
 def swipe(direction):
  x,y=int(W*.45),int(H*.45);dx,dy={'right':(int(W*.3),0),'up':(0,-int(H*.2)),'down':(0,int(H*.2))}[direction];d.adb('shell','input','swipe',str(x),str(y),str(x+dx),str(y+dy),'220')
 def activate(n,menu):
- d.tap(n['cx'],n['cy'],False)
- time.sleep(.25);swipe('right')
+ if menu:
+  d.tap(n['cx'],n['cy'],False);time.sleep(.25);swipe('right');return
+ # Match touch cursor is a known product defect. Use standard keyboard focus
+ # to complete the separate engine check, without bypassing game event handlers.
+ import xml.etree.ElementTree as ET
+ target=(n['desc'] or n['text']).strip()
+ for attempt in range(45):
+  xml=d.dump_ui()
+  try: tree=ET.fromstring(xml)
+  except ET.ParseError: raise RuntimeError('Invalid UI tree while focusing '+target)
+  focused=[x for x in tree.iter('node') if x.get('focused')=='true']
+  if any((x.get('content-desc') or x.get('text') or '').strip()==target for x in focused):
+   d.adb('shell','input','keyevent','66');return
+  d.adb('shell','input','keyevent','61');time.sleep(.15)
+ raise RuntimeError('Could not keyboard-focus match control '+target)
 def find(ns,rx):
  r=re.compile(rx,re.I)
  return next((n for n in ns if n['package']==d.PKG and n['clickable'] and n['w']>0 and n['h']>0 and any(r.search(v.strip()) for v in [n['desc'],n['text']] if v.strip())),None)
