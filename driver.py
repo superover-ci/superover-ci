@@ -74,7 +74,7 @@ def pid():
 def foreground_pkg():
     try:
         out = adb("shell", "dumpsys", "window", "displays", timeout=20)
-        m = re.search(r"mCurrentFocus=\S+\s+([\w.]+)/", out)
+        m = re.search(r"mCurrentFocus=.*?\s([\w.]+)/", out)
         return m.group(1) if m else ""
     except Exception:
         return ""
@@ -82,7 +82,7 @@ def foreground_pkg():
 def ensure_foreground(step, counts):
     """If focus has left the game (e.g. BACK at the root screen), relaunch it."""
     fp = foreground_pkg()
-    if fp and fp != PKG:
+    if fp != PKG:
         counts["escape"] += 1
         emit({"type": "event", "event": "APP_ESCAPE", "step": step, "screen": fp})
         adb("shell", "am", "start", "-n", MAIN)
@@ -113,6 +113,7 @@ def nodes(xml):
         x1, y1, x2, y2 = map(int, b.groups())
         out.append({
             "cls": (n.get("class") or "").rsplit(".", 1)[-1],
+            "package": n.get("package") or "",
             "desc": n.get("content-desc") or "",
             "text": n.get("text") or "",
             "clickable": n.get("clickable") == "true",
@@ -255,7 +256,7 @@ def main():
                     # fall through to a random action so waiting tours still move
 
         if not acted:
-            actionable = [n for n in ns if n["clickable"] and (n["desc"] or n["text"])
+            actionable = [n for n in ns if n["package"] == PKG and n["clickable"] and (n["desc"] or n["text"])
                           and n["w"] > 0 and n["h"] > 0]
             roll = rng.random()
             if actionable and roll < 0.80:

@@ -1,0 +1,70 @@
+# Full matrix: Android 11-14 (API 30-34), one emulator per version.
+# Runs weekly on a timer, and on every new build it is dispatched twice by the
+# build process with different seed_base/profile inputs (= 2 full runs per build).
+# Place at .github/workflows/autotest-full.yml
+name: Deterministic 10.1.9 match gate
+on:
+  workflow_dispatch:
+
+jobs:
+  full:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [30, 34]   # Android 11, 12, 12L, 13, 14
+    name: "Match gate API ${{ matrix.api }}"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable KVM
+        run: |
+          sudo chmod 666 /dev/kvm
+
+      - name: Download and verify the CI build
+        env:
+          PART_IDS: ${{ secrets.SUPEROVER_APK_PART_IDS }}
+          APK_SHA: ${{ secrets.SUPEROVER_APK_SHA256 }}
+        run: |
+          i=1
+          for id in $(echo "$PART_IDS" | tr ',' ' '); do
+            curl -sSL --retry 4 --retry-all-errors "https://drive.google.com/uc?export=download&id=$id" -o "part$i"
+            if [ "$(head -c 1 "part$i")" = "<" ]; then
+              # Drive virus-scan interstitial: retry through the confirm endpoint
+              curl -sSL --retry 4 --retry-all-errors "https://drive.usercontent.google.com/download?id=$id&export=download&confirm=t" -o "part$i"
+            fi
+            i=$((i+1))
+          done
+          cat part1 part2 part3 part4 > game.apk
+          echo "$APK_SHA  game.apk" | sha256sum -c -
+
+      - name: Install emulator dependencies
+        run: sudo apt-get update && sudo apt-get install -y libpulse0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Boot emulator and run sessions
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot-save -noaudio -no-boot-anim -memory 3072
+          script: |
+            adb wait-for-device
+            adb shell settings put global window_animation_scale 0
+            adb shell settings put global transition_animation_scale 0
+            adb shell settings put global animator_duration_scale 0
+            adb install -r game.apk
+            python3 validate_match.py artifacts/api${{ matrix.api }}
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: match-gate-api${{ matrix.api }}-run${{ github.run_number }}
+          path: artifacts/api${{ matrix.api }}
+          retention-days: 30
